@@ -37,31 +37,6 @@ class MainViewModel : ViewModel() {
         uiState = uiState.copy(url = newUrl)
     }
 
-    /*fun startDownload(context: Context) {
-        if (!URLUtil.isValidUrl(uiState.url)) {
-            uiState = uiState.copy(statusMessage = "상태: 유효하지 않은 URL입니다.")
-            return
-        }
-
-        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val fileName = URLUtil.guessFileName(uiState.url, null, null)
-
-        val request = DownloadManager.Request(Uri.parse(uiState.url))
-            .setTitle(fileName)
-            .setDescription("파일 다운로드 중...")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
-
-        val downloadId = downloadManager.enqueue(request)
-
-        uiState = uiState.copy(
-            statusMessage = "상태: 다운로드 시작 (ID: $downloadId)",
-            isDownloading = true
-        )
-    }*/
-
     private val _workInfo = MutableStateFlow<WorkInfo?>(null)
     val workInfo: StateFlow<WorkInfo?> = _workInfo
 
@@ -114,21 +89,24 @@ class MainViewModel : ViewModel() {
 
     private fun openFile(context: Context, filePath: String?) {
         filePath?.let {
-            val file = File(it)
-            val authority = "${context.packageName}.provider"
-            val contentUri = FileProvider.getUriForFile(context, authority, file)
-
-            val mimeType = MimeTypeMap.getSingleton()
-                .getMimeTypeFromExtension(file.extension)
-
-            val openIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(contentUri, mimeType)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
             try {
+                val file = File(it)
+                // 1. AndroidManifest.xml에 정의한 authority와 일치시킴
+                val authority = "${context.packageName}.provider"
+                // 2. FileProvider를 통해 안전한 content:// URI 생성
+                val contentUri = FileProvider.getUriForFile(context, authority, file)
+
+                val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension) ?: "*/*"
+
+                // 3. 생성된 content:// URI로 Intent 실행
+                val openIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(contentUri, mimeType)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
                 context.startActivity(openIntent)
             } catch (e: Exception) {
-                // 이 파일을 열 수 있는 앱이 없음
+                // ActivityNotFoundException, IllegalArgumentException 등 처리
+                // 예: Toast.makeText(context, "파일을 열 수 없습니다.", Toast.LENGTH_SHORT).show()
             }
         }
     }
